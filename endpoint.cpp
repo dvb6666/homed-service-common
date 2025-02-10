@@ -164,33 +164,55 @@ void AbstractDeviceObject::publishExposes(HOMEd *controller, const QString &addr
 
 QVariant AbstractMetaObject::option(const QString &name, const QVariant &defaultValue)
 {
-    AbstractDeviceObject *device = reinterpret_cast <AbstractDeviceObject*> (m_parent->device().data());
-    QString optionName = name.isEmpty() ? m_name : name;
-    QVariant value = device->options().value(QString("%1_%2").arg(optionName, QString::number(m_parent->id())));
-    return value.isValid() ? value : device->options().value(optionName, defaultValue);
-}
+    QVariant value;
 
-quint8 AbstractMetaObject::endpointId(void)
-{
-    return m_parent->id();
+    if (m_parent)
+    {
+        AbstractDeviceObject *device = reinterpret_cast <AbstractDeviceObject*> (m_parent->device().data());
+        QString optionName = name.isEmpty() ? m_name : name;
+        QList <QString> list = optionName.split('_');
+
+        if (list.count() == 1)
+            optionName.append(QString("_%2").arg(m_parent->id()));
+
+        value = device->options().contains(optionName) ? device->options().value(optionName) : device->options().value(list.at(0), defaultValue);
+    }
+
+    return value;
 }
 
 quint8 AbstractMetaObject::version(void)
 {
-    return reinterpret_cast <AbstractDeviceObject*> (m_parent->device().data())->version();
+    return m_parent ? reinterpret_cast <AbstractDeviceObject*> (m_parent->device().data())->version() : 0;
 }
 
 QString AbstractMetaObject::manufacturerName(void)
 {
-    return reinterpret_cast <AbstractDeviceObject*> (m_parent->device().data())->manufacturerName();
+    return m_parent ? reinterpret_cast <AbstractDeviceObject*> (m_parent->device().data())->manufacturerName() : QString();
 }
 
 QString AbstractMetaObject::modelName(void)
 {
-    return reinterpret_cast <AbstractDeviceObject*> (m_parent->device().data())->modelName();
+    return m_parent ? reinterpret_cast <AbstractDeviceObject*> (m_parent->device().data())->modelName() : QString();
 }
 
-QMap <QString, QVariant> &AbstractMetaObject::meta(void)
+QVariant AbstractMetaObject::meta(const QString &key, const QVariant &defaultValue)
 {
-    return m_parent->meta();
+    return m_parent ? m_parent->meta().value(key, defaultValue) : defaultValue;
+}
+
+void AbstractMetaObject::setMeta(const QString &key, const QVariant &value)
+{
+    if (!m_parent)
+        return;
+
+    m_parent->meta().insert(key, value);
+}
+
+void AbstractMetaObject::clearMeta(const QString &key)
+{
+    if (!m_parent)
+        return;
+
+     m_parent->meta().remove(key);
 }
