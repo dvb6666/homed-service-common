@@ -31,12 +31,7 @@ Expression::Expression(QString string) : m_result(NAN)
         QString value = expression.cap();
 
         if (number.indexIn(value) != -1)
-        {
-            if (position && !QString("+-*/^(").contains(string.at(position - 1)))
-                return;
-
             items.append({Type::Number, value});
-        }
         else
             items.append({itemType(value), value});
 
@@ -235,10 +230,51 @@ void Expression::calculate(void)
     m_result = result.at(0);
 }
 
-QVariant Parser::jsonValue(const QJsonObject &json, const QString &path)
+QString Parser::arrayValue(const QString &string)
 {
+    QRegExp regexp("\\((.*)\\)");
+
+    if (regexp.indexIn(string) != -1)
+    {
+        QList <QString> actionList = {"fromHex", "toHex"};
+
+        switch (actionList.indexOf(string.mid(0, string.indexOf(0x28))))
+        {
+            case 0: // fromHex
+            {
+                QByteArray data = QByteArray::fromHex(regexp.cap(1).toUtf8());
+                QList <QString> list;
+
+                for (int i = 0; i < data.length(); i++)
+                    list.append(QString::number(static_cast <quint8> (data.at(i))));
+
+                return list.join(',');
+            }
+
+            case 1: // toHex
+            {
+                QList <QString> list = regexp.cap(1).split(',');
+                QByteArray data;
+
+                for (int i = 0; i < list.count(); i++)
+                    data.append(static_cast <char> (list.at(i).toInt()));
+
+                return QString(data.toHex()).toUpper();
+            }
+
+            default:
+                break;
+        }
+    }
+
+    return string;
+}
+
+QVariant Parser::jsonValue(const QByteArray &data, const QString &path)
+{
+    QJsonDocument documement = QJsonDocument::fromJson(data);
     QList <QString> list = path.split('.');
-    QJsonObject object = json;
+    QJsonValue value;
 
     for (int i = 0; i < list.count(); i++)
     {
@@ -252,19 +288,17 @@ QVariant Parser::jsonValue(const QJsonObject &json, const QString &path)
             key = key.mid(0, position);
         }
 
-        if (!object.contains(key))
-            break;
+        if (!key.isEmpty())
+            value = documement.object().value(key);
 
-        if (i < list.length() - 1)
-        {
-            object = index < 0 ? object.value(key).toObject() : object.value(key).toArray().at(index).toObject();
-            continue;
-        }
+        if (index >= 0)
+            value = value.isArray() ? value.toArray().at(index) : documement.array().at(index);
 
-        return index < 0 ? object.value(key).toVariant() : object.value(key).toArray().at(index).toVariant();
+        if (i < list.count() - 1)
+            documement = value.isArray() ? QJsonDocument(value.toArray()) : QJsonDocument(value.toObject());
     }
 
-    return QVariant();
+    return value.toVariant();
 }
 
 QVariant Parser::stringValue(const QString &string)
@@ -275,8 +309,8 @@ QVariant Parser::stringValue(const QString &string)
     if (check)
         return value;
 
-    if (string != "true" && string != "false")
-        return string;
+    if (string == "true" || string == "false")
+        return string == "true" ? true : false;
 
-    return string == "true" ? true : false;
+    return string.isEmpty() ? QVariant() : string;
 }

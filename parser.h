@@ -62,7 +62,7 @@ private:
         QString value;
     };
 
-    inline double radian(double value) { return (value / 180 * M_PI); }
+    inline double radian(double value) { return value / 180 * M_PI; }
 
     double m_result;
     QVector <Item> m_items;
@@ -79,7 +79,8 @@ class Parser
 
 public:
 
-    static QVariant jsonValue(const QJsonObject &json, const QString &path);
+    static QString arrayValue(const QString &string);
+    static QVariant jsonValue(const QByteArray &data, const QString &path);
     static QVariant stringValue(const QString &string);
 
 };
